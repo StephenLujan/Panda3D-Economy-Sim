@@ -42,6 +42,9 @@ def getSize(object):
 def getRadius(object):
     return getSize(object) * 0.5
 
+def cubeRoot(x):
+    return math.copysign(math.pow(abs(x), 1.0/3.0), x)
+
 class TradeRoute():
     def __init__(self, start, end):
         self.start = start
@@ -116,7 +119,7 @@ class Transporter():
         self.ai = AICharacter(self.name, self.model, 100, 10, 10)
         self.aiworld.addAiChar(self.ai)
         self.behaviors = self.ai.getAiBehaviors()
-        self.behaviors.obstacleAvoidance(0.2)
+        self.behaviors.obstacleAvoidance(1.0)
         self.aiworld.addObstacle(self.model)
         taskMgr.doMethodLater(0.5, self.updateAI, "transporter ai")
 
@@ -128,7 +131,6 @@ class Transporter():
             self.grab(Cargo(factory.productType))
             return True
         return False
-
 
     def sell(self, factory):
         '''Sell one product to input factory if possible.'''
@@ -182,10 +184,17 @@ class Transporter():
 
     def setGoal(self, goal):
         self.goal = goal
-        print self.name,"'s goal: ",self.goal
+        if not goal == None:
+            print self.name, "'s goal: ", self.goal.name
+        else:
+            print self.name, "'s goal: None"
+
+    def stop(self):
+        self.behaviors.removeAi("seek")
 
     def updateAI(self, task):
 
+        #self.stop()
         # If ai has no current goal, try to find one.
         if (self.goal == None):
             if (self.tradeRoute == None):
@@ -225,7 +234,6 @@ class Transporter():
         return Task.again
 
 
-
 class Factory():
     def __init__(self, name, aiworld, position=Vec3(0, 0, 0), resourceType=0, productType=1):
         self.name = name
@@ -241,6 +249,7 @@ class Factory():
         self.productNP = NodePath(PandaNode("product"))
         self.productNP.reparentTo(self.model)
         self.productNP.setPos(5, 0, 15)
+        self.productNP.setHpr(90,0,0)
         self.productNP.setTransparency(TransparencyAttrib.MAlpha)
         self.productModel = Cargo(productType)
         self.productModel.model.reparentTo(self.productNP)
@@ -249,6 +258,7 @@ class Factory():
             self.resourceNP = NodePath(PandaNode("resource"))
             self.resourceNP.reparentTo(self.model)
             self.resourceNP.setPos(-5, 0, 15)
+            self.resourceNP.setHpr(90,0,0)
             self.resourceNP.setTransparency(TransparencyAttrib.MAlpha)
             self.resourceModel = Cargo(resourceType)
             self.resourceModel.model.reparentTo(self.resourceNP)
@@ -278,7 +288,7 @@ class Factory():
 
     def updateDisplay(self):
         if self.product > 0:
-            self.productNP.setScale(math.sqrt(self.product))
+            self.productNP.setScale(math.pow(self.product, 1.0/3.0))
             self.productNP.setAlphaScale(1)
         else:
             self.productNP.setAlphaScale(0.3)
@@ -287,7 +297,7 @@ class Factory():
             return
 
         if self.resource > 0:
-            self.resourceNP.setScale(math.sqrt(self.resource))
+            self.resourceNP.setScale(math.pow(self.resource, 1.0/3.0))
             self.resourceNP.setAlphaScale(1)
         else:
             self.resourceNP.setAlphaScale(0.3)
@@ -319,6 +329,9 @@ class Cargo():
             c = (0, 1, 0, 1)
         elif type == 3:
             c = (0, 0, 1, 1)
+        elif type == 4:
+            c = (1, 1, 0, 1)
+            
         self.model.setColor(c)
     def carryOn(self, carrier):
         self.model.setPos(0, -1.3, 0)
@@ -346,13 +359,24 @@ class World(DirectObject):
     def loadModels(self):
         # transporter
         self.trans = Transporter('Mr. Red', self.AIworld, self.tradeMap, Vec3(-10, 0, 0))
-        self.trans.model.setColor(1,0,0)
+        self.trans.model.setColor(1, 0, 0)
 
         self.trans = Transporter('Mr. Green', self.AIworld, self.tradeMap, Vec3(3, -3, 0))
-        self.trans.model.setColor(0,1,0)
+        self.trans.model.setColor(0, 1, 0)
 
         self.trans = Transporter('Mr. Blue', self.AIworld, self.tradeMap, Vec3(10, 3, 0))
-        self.trans.model.setColor(0,0,1)
+        self.trans.model.setColor(0, 0, 1)
+        
+        self.trans = Transporter('Mr. Yellow', self.AIworld, self.tradeMap, Vec3(10, -6, 0))
+        self.trans.model.setColor(1, 1, 0)
+
+        self.trans = Transporter('Mr. Purple', self.AIworld, self.tradeMap, Vec3(-10, -5, 0))
+        self.trans.model.setColor(1, 0, 1)
+
+        self.trans = Transporter('Mr. Gray', self.AIworld, self.tradeMap, Vec3(-11, 4, 0))
+        self.trans.model.setColor(0.3, 0.3, 0.3)
+
+
 
         #test
         #self.trans.grab(Cargo())
@@ -365,11 +389,13 @@ class World(DirectObject):
         self.target.reparentTo(render)
 
         # factories
-        self.tradeMap.addFactory(Factory('fac1', self.AIworld, Vec3(0, -5, 0)))
-        self.tradeMap.addFactory(Factory('fac2', self.AIworld, Vec3(7, 5, 0), 1, 2))
-        self.tradeMap.addFactory(Factory('fac3', self.AIworld, Vec3(8, -7, 0), 1, 2))
-        self.tradeMap.addFactory(Factory('fac4', self.AIworld, Vec3(-3, 8, 0), 2, 3))
-        self.tradeMap.addFactory(Factory('fac5', self.AIworld, Vec3(-7, -6, 0)))
+        self.tradeMap.addFactory(Factory('Red Factory 1', self.AIworld, Vec3(0, -5, 0)))
+        self.tradeMap.addFactory(Factory('Red Factory 2', self.AIworld, Vec3(-7, -9, 0)))
+        self.tradeMap.addFactory(Factory('Green Factory 1', self.AIworld, Vec3(-3, 8, 0), 1, 2))
+        self.tradeMap.addFactory(Factory('Green Factory 2', self.AIworld, Vec3(7, 5, 0), 1, 2))
+        self.tradeMap.addFactory(Factory('Blue Factory 1', self.AIworld, Vec3(8, -7, 0), 2, 3))
+        self.tradeMap.addFactory(Factory('Blue Factory 2', self.AIworld, Vec3(-9, 10, 0), 2, 3))
+        self.tradeMap.addFactory(Factory('Yellow Factory', self.AIworld, Vec3(-12, 0, 0), 3, 4))
         
       
     def setAI(self):
